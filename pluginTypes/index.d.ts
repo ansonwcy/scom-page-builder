@@ -1105,12 +1105,14 @@ declare module "@scom/scom-page-builder/page/pageRow.css.ts" { }
 declare module "@scom/scom-page-builder/utility/type.ts" {
     export type IMergeDropSide = "front" | "back" | "top" | "bottom";
     export type DragDropResultDetails = {
+        row?: HTMLElement;
         section?: HTMLElement;
         toolbar?: HTMLElement;
         dropSide?: IMergeDropSide;
         rowBlock?: HTMLElement;
         column?: number;
         columnSpan?: number;
+        isMouseOn?: boolean;
     };
     export type DragDropResult = {
         canDrop: boolean;
@@ -1119,7 +1121,7 @@ declare module "@scom/scom-page-builder/utility/type.ts" {
     export interface checkDragDropResultParams {
         dropTarget: HTMLElement;
         dragSection: HTMLElement;
-        dragToolbardata: any;
+        dragToolbar: HTMLElement;
         clientX: number;
         clientY: number;
         startX: number;
@@ -1172,7 +1174,7 @@ declare module "@scom/scom-page-builder/page/pageRow.tsx" {
         constructor(parent?: any);
         get data(): any;
         get selectedElement(): PageSection;
-        private get maxColumn();
+        get maxColumn(): number;
         private get align();
         get gridColumnWidth(): number;
         init(): void;

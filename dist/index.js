@@ -4305,6 +4305,7 @@ define("@scom/scom-page-builder/utility/dragDrop.ts", ["require", "exports", "@s
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.checkDragDropResult = void 0;
     function checkDragDropResult(dragDrop) {
+        var _a, _b;
         if (!dragDrop.dropTarget)
             return { canDrop: false };
         const dropRow = dragDrop.dropTarget.closest('ide-row');
@@ -4330,27 +4331,28 @@ define("@scom/scom-page-builder/utility/dragDrop.ts", ["require", "exports", "@s
                 }
             };
         }
-        // case 0: drag from toolbar
-        // if (!dragDrop.dragSection) {
-        // }
         // if it is ungroup, need to include the current section
         const mouseOnSection = dragDrop.isUngroup || !dragDrop.dragSection ?
             findNearestSectionInRow(dropRow, dragDrop.clientX, dragDrop.clientY, true) :
             findNearestSectionInRow(dropRow, dragDrop.clientX, dragDrop.clientY, true, [dragDrop.dragSection.id]);
         if (mouseOnSection) {
+            // case 0: drag from toolbar to empty section
+            const nearestToolbar = (!dragDrop.dragSection) ?
+                findNearestToolbarInSection(mouseOnSection, dragDrop.clientY, dragDrop.clientX, false) :
+                findNearestToolbarInSection(mouseOnSection, dragDrop.clientY, dragDrop.clientX, false, [dragDrop.dragToolbar.id]);
+            if (!nearestToolbar)
+                return { canDrop: false };
             // case 2: mouse on other section (group, ungroup to another widget group)
             // or
             // case 3 mouse on same section (move, ungroup to itself)
-            const nearestToolbar = findNearestToolbarInSection(mouseOnSection, dragDrop.clientY, dragDrop.clientX, false);
-            if (!nearestToolbar)
-                return;
-            const mergeSide = decideMergeSide(nearestToolbar.toolbar, dragDrop.clientX, dragDrop.clientY);
+            const mergeSide = decideMergeSide(nearestToolbar, dragDrop.clientX, dragDrop.clientY);
             if (mergeSide == "top" || mergeSide == "bottom") {
                 return {
                     canDrop: true,
                     details: {
-                        toolbar: nearestToolbar.toolbar,
-                        dropSide: mergeSide
+                        toolbar: nearestToolbar,
+                        dropSide: mergeSide,
+                        isMouseOn: true
                     }
                 };
             }
@@ -4358,7 +4360,7 @@ define("@scom/scom-page-builder/utility/dragDrop.ts", ["require", "exports", "@s
                 const isFront = mergeSide == "front" ? true : false;
                 const dragSectionCol = dragDrop.dragSection ? parseInt(dragDrop.dragSection.dataset.column) : 4;
                 const dragSectionColSpan = dragDrop.dragSection ? parseInt(dragDrop.dragSection.dataset.columnSpan) : 4;
-                const dropFrontBackResult = getDropFrontBackResult(dropRow, mouseOnSection, dragSectionCol, dragSectionColSpan, isFront, dragDrop.dragToolbardata);
+                const dropFrontBackResult = getDropFrontBackResult(dropRow, mouseOnSection, dragSectionCol, dragSectionColSpan, isFront, (_a = dragDrop.dragToolbar) === null || _a === void 0 ? void 0 : _a.dataset);
                 // check if it can merge with the drop section
                 if (dropFrontBackResult) {
                     return {
@@ -4367,7 +4369,8 @@ define("@scom/scom-page-builder/utility/dragDrop.ts", ["require", "exports", "@s
                             section: mouseOnSection,
                             dropSide: mergeSide,
                             column: dropFrontBackResult.newElmdata.column,
-                            columnSpan: dropFrontBackResult.newElmdata.columnSpan
+                            columnSpan: dropFrontBackResult.newElmdata.columnSpan,
+                            isMouseOn: true
                         }
                     };
                 }
@@ -4377,6 +4380,10 @@ define("@scom/scom-page-builder/utility/dragDrop.ts", ["require", "exports", "@s
             }
         }
         else {
+            // case 0: drag from toolbar to empty section
+            if (!dragDrop.dragSection) {
+                return { canDrop: true };
+            }
             // case 4: mouse on empty space
             // check if collide
             const collidedSection = checkCollisionIfDropOnGrid(dragDrop, dropRow);
@@ -4385,14 +4392,15 @@ define("@scom/scom-page-builder/utility/dragDrop.ts", ["require", "exports", "@s
                 const isFront = (dragDrop.clientX < collidedSectionBound.left) ? true : false;
                 const dragSectionCol = dragDrop.dragSection ? parseInt(dragDrop.dragSection.dataset.column) : 4;
                 const dragSectionColSpan = dragDrop.dragSection ? parseInt(dragDrop.dragSection.dataset.columnSpan) : 4;
-                const dropFrontBackResult = getDropFrontBackResult(dropRow, collidedSection, dragSectionCol, dragSectionColSpan, isFront, dragDrop.dragToolbardata);
+                const dropFrontBackResult = getDropFrontBackResult(dropRow, collidedSection, dragSectionCol, dragSectionColSpan, isFront, (_b = dragDrop.dragToolbar) === null || _b === void 0 ? void 0 : _b.dataset);
                 return {
                     canDrop: true,
                     details: {
                         section: collidedSection,
                         dropSide: isFront ? "front" : "back",
                         column: dropFrontBackResult.newElmdata.column,
-                        columnSpan: dropFrontBackResult.newElmdata.columnSpan
+                        columnSpan: dropFrontBackResult.newElmdata.columnSpan,
+                        isMouseOn: false
                     }
                 };
             }
@@ -4402,6 +4410,48 @@ define("@scom/scom-page-builder/utility/dragDrop.ts", ["require", "exports", "@s
         }
     }
     exports.checkDragDropResult = checkDragDropResult;
+    function getDropResultOnEmptyRow(dragDrop) {
+        var _a;
+        let target = findNearestFixedGridInRow(dragDrop.clientX, dragDrop.dropTarget);
+        // if (collision.collisionType == 'self') target = findNearestFixedGridInRow(clientX);
+        // else target = enterTarget.closest('.fixed-grid-item') as Control;
+        const dropRow = target.closest('ide-row');
+        let offsetLeft = Math.floor((dragDrop.startX + index_42.GAP_WIDTH) / (dropRow.gridColumnWidth + index_42.GAP_WIDTH));
+        const targetCol = Number(target.dataset.column);
+        const column = targetCol - offsetLeft > 0 ? targetCol - offsetLeft : targetCol;
+        const columnSpan = dragDrop.dragSection && dragDrop.dragSection.dataset.columnSpan
+            ? Number(dragDrop.dragSection.dataset.columnSpan)
+            : index_42.INIT_COLUMN_SPAN;
+        let colSpan = Math.min(columnSpan, dropRow.maxColumn);
+        let colStart = Math.min(column, dropRow.maxColumn);
+        const sections = Array.from(dropRow === null || dropRow === void 0 ? void 0 : dropRow.querySelectorAll('ide-section'));
+        const sortedSections = sections.sort((a, b) => Number(b.dataset.column) - Number(a.dataset.column));
+        let spaces = 0;
+        let findedSection = null;
+        let isUpdated = false;
+        // const isFromToolbar = !self.currentElement?.id;
+        for (let i = 0; i < sortedSections.length; i++) {
+            const section = sortedSections[i];
+            const sectionColumn = Number(section.dataset.column);
+            const sectionColumnSpan = Number(section.dataset.columnSpan);
+            const sectionData = sectionColumn + sectionColumnSpan;
+            if (colStart >= sectionData && (dropRow.maxColumn - colStart) + 1 < colSpan && !isUpdated) {
+                colStart = sectionData;
+                isUpdated = true;
+            }
+            const colData = colStart + colSpan;
+            if ((colStart >= sectionColumn && colData <= sectionData) || (colStart < sectionData && colData > sectionData)) {
+                findedSection = section;
+            }
+            if (((_a = dragDrop.dragSection) === null || _a === void 0 ? void 0 : _a.id) !== section.id) {
+                spaces += sectionColumnSpan;
+            }
+        }
+        return {
+            column: colStart,
+            columnSpan: Math.min(columnSpan, index_42.MAX_COLUMN - spaces)
+        };
+    }
     function checkCollisionIfDropOnGrid(dragDrop, dropRow) {
         const nearestCol = findNearestFixedGridInRow(dragDrop.clientX, dragDrop.dropTarget);
         const dropColumn = parseInt(nearestCol.getAttribute('data-column'));
@@ -4448,23 +4498,50 @@ define("@scom/scom-page-builder/utility/dragDrop.ts", ["require", "exports", "@s
         });
         return nearestElement;
     }
-    function findNearestToolbarInSection(section, clientY, clientX, mouseOn) {
-        if (!section || !clientY)
-            return;
-        const sectionBound = section.getBoundingClientRect();
-        if (clientY < sectionBound.top || clientY > sectionBound.bottom || clientX < sectionBound.left || clientX > sectionBound.right)
-            return;
-        const toolbars = section.querySelectorAll('ide-toolbar');
-        for (let i = 0; i < toolbars.length; i++) {
-            const toolbarBound = toolbars[i].getBoundingClientRect();
-            const condition = mouseOn ?
-                (toolbarBound.top <= clientY && toolbarBound.top + toolbarBound.height >= clientY)
-                : ((i == 0 && clientY <= toolbarBound.top) ||
-                    (i == toolbars.length - 1 && clientY >= toolbarBound.bottom) ||
-                    (toolbarBound.top <= clientY && toolbarBound.top + toolbarBound.height >= clientY));
-            if (condition) {
-                return { toolbar: toolbars[i], index: i };
+    function findNearestToolbarInSection(section, clientY, clientX, mouseOn, excludingToolbarId) {
+        if (mouseOn) {
+            const toolbars = section.querySelectorAll('ide-toolbar');
+            for (let i = 0; i < toolbars.length; i++) {
+                const sectionBound = toolbars[i].getBoundingClientRect();
+                const checkExcludingToolbar = excludingToolbarId ? !excludingToolbarId.includes(toolbars[i].id) : true;
+                if (checkExcludingToolbar &&
+                    sectionBound.top <= clientY && sectionBound.bottom >= clientY &&
+                    sectionBound.left <= clientX && sectionBound.right >= clientX) {
+                    return toolbars[i];
+                }
             }
+        }
+        else {
+            const toolbars = section.querySelectorAll('ide-toolbar');
+            if (toolbars.length === 0) {
+                return null; // Return null for an empty list of elements
+            }
+            let nearestDistance = Infinity;
+            let nearestToolbar = null;
+            for (const toolbar of toolbars) {
+                const checkExcludingToolbar = excludingToolbarId ? !excludingToolbarId.includes(toolbar.id) : true;
+                if (checkExcludingToolbar) {
+                    const sectionRect = toolbar.getBoundingClientRect();
+                    const topPoint = sectionRect.top;
+                    const bottomPoint = sectionRect.right;
+                    // Calculate the distances between the point and both the left and right points of the element
+                    const topDistance = Math.abs(topPoint - clientY);
+                    const bottomDistance = Math.abs(bottomPoint - clientY);
+                    // Check if the left point is nearer than the current nearest point
+                    if (topDistance < nearestDistance) {
+                        // isFront = true;
+                        nearestDistance = topDistance;
+                        nearestToolbar = toolbar;
+                    }
+                    // Check if the right point is nearer than the current nearest point
+                    if (bottomDistance < nearestDistance) {
+                        // isFront = false;
+                        nearestDistance = bottomDistance;
+                        nearestToolbar = toolbar;
+                    }
+                }
+            }
+            return nearestToolbar;
         }
     }
     function findNearestSectionInRow(row, clientX, clientY, mouseOn, excludingSectionId) {
@@ -4547,12 +4624,12 @@ define("@scom/scom-page-builder/utility/dragDrop.ts", ["require", "exports", "@s
         if (emptySpace >= dragSectionColSpan) {
             // have enough space to place the dragging toolbar
             const newColumn = isFront ?
-                sortedSectionList[dropSectionIdx].column - data.columnSpan :
+                sortedSectionList[dropSectionIdx].column - dragSectionColSpan :
                 sortedSectionList[dropSectionIdx].column + sortedSectionList[dropSectionIdx].columnSpan;
             const newElData = {
                 id: data.id,
                 column: newColumn,
-                columnSpan: data.columnSpan,
+                columnSpan: dragSectionColSpan,
                 properties: data.properties,
                 module: data.module,
                 tag: data.tag
@@ -5296,42 +5373,9 @@ define("@scom/scom-page-builder/page/pageRow.tsx", ["require", "exports", "@ijst
             function dragLeave(leaveTarget, clientX, isOverlap = false) {
                 if (!leaveTarget)
                     return;
-                let target;
-                if (isOverlap)
-                    target = findNearestFixedGridInRow(clientX);
-                else
-                    target = leaveTarget.closest('.fixed-grid-item');
-                // if leaving a fixed-grid-item
+                let target = (isOverlap) ? findNearestFixedGridInRow(clientX) : leaveTarget.closest('.fixed-grid-item');
                 if (target)
                     removeRectangles();
-                else {
-                    const blocks = parentWrapper.getElementsByClassName('is-dragenter');
-                    const currentSection = leaveTarget.closest('ide-section');
-                    const currentRow = leaveTarget.closest('ide-row');
-                    const isCurrentEnter = (block) => {
-                        let result = false;
-                        if (block.classList.contains(ROW_BOTTOM_CLASS)) {
-                            const blockRow = block.closest('ide-row');
-                            result = currentRow && blockRow && currentRow.id === blockRow.id;
-                        }
-                        else if (block.classList.contains(ROW_TOP_CLASS)) {
-                            const blockRow = block.closest('ide-row');
-                            result = currentRow && blockRow && currentRow.id === blockRow.id;
-                        }
-                        else {
-                            const blockSection = block.closest('ide-section');
-                            result = currentSection && blockSection && currentSection.id === blockSection.id;
-                        }
-                        return result;
-                    };
-                    for (const block of blocks) {
-                        if (isCurrentEnter(block))
-                            continue;
-                        const visible = block.classList.contains(ROW_BOTTOM_CLASS) || block.classList.contains(ROW_TOP_CLASS);
-                        block.visible = visible;
-                        block.classList.remove('is-dragenter');
-                    }
-                }
             }
             this.addEventListener('dragenter', function (event) {
                 const eventTarget = event.target;
@@ -5344,78 +5388,86 @@ define("@scom/scom-page-builder/page/pageRow.tsx", ["require", "exports", "@ijst
                 const eventTarget = event.target;
                 let enterTarget;
                 const dragStartTargetSection = (dragStartTarget) ? dragStartTarget.closest('ide-section') : undefined;
-                const collision = checkCollision(eventTarget, dragStartTargetSection, event.clientX, event.clientY);
                 const dragDropResult = (0, dragDrop_1.checkDragDropResult)({
                     dropTarget: eventTarget,
                     dragSection: dragStartTargetSection,
-                    dragToolbardata: self.currentElement.dataset,
+                    dragToolbar: (self.currentToolbar) ? self.currentToolbar : undefined,
                     clientX: event.clientX,
                     clientY: event.clientY,
                     startX: startX,
                     isUngroup: self.isUngrouping()
                 });
-                // if target overlap with itself
-                if ((collision.collisionType == 'self' && !collision.toolbar) || collision.collisionType == 'none') {
-                    const cursorPosition = { x: event.clientX, y: event.clientY };
-                    const elements = self.pnlRow.querySelectorAll('.fixed-grid-item');
-                    let nearestElement = null;
-                    let minDistance = Number.MAX_VALUE;
-                    // time complexity = O(columnSpan)
-                    elements.forEach((element) => {
-                        const bounds = element.getBoundingClientRect();
-                        const distanceLeft = Math.abs(bounds.left - cursorPosition.x);
-                        const distanceRight = Math.abs(bounds.right - cursorPosition.x);
-                        if (distanceLeft < minDistance) {
-                            minDistance = distanceLeft;
-                            nearestElement = element;
+                if (dragDropResult.canDrop) {
+                    if (dragDropResult.details) {
+                        // dragover rowBlock
+                        if (dragDropResult.details.rowBlock) {
+                            updateClass(dragDropResult.details.rowBlock, 'is-dragenter');
                         }
-                        if (distanceRight < minDistance) {
-                            minDistance = distanceRight;
-                            nearestElement = element;
+                        // dragover section
+                        else if (dragDropResult.details.section && dragDropResult.details.dropSide) {
+                            // show section's front/back block
+                            if (dragDropResult.details.isMouseOn) {
+                                const section = dragDropResult.details.section;
+                                if (dragDropResult.details.dropSide == "front") {
+                                    const frontBlock = section.querySelector('.front-block');
+                                    if (frontBlock) {
+                                        frontBlock.visible = true;
+                                        updateClass(frontBlock, 'is-dragenter');
+                                    }
+                                }
+                                else if (dragDropResult.details.dropSide == "back") {
+                                    const backBlock = section.querySelector('.back-block');
+                                    if (backBlock) {
+                                        backBlock.visible = true;
+                                        updateClass(backBlock, 'is-dragenter');
+                                    }
+                                }
+                                else {
+                                    console.error("Section's dropSide can only be 'front' or 'back'");
+                                }
+                            }
+                            // show frame
+                            else {
+                                // if (enterTarget == dragOverTarget) return;
+                                // leave previous element: dragOverTarget
+                                dragLeave(dragOverTarget, event.clientX, true);
+                                // enter current element: enterTarget
+                                dragEnter(enterTarget, event.clientX, event.clientY);
+                                dragOverTarget = enterTarget;
+                            }
                         }
-                    });
-                    enterTarget = nearestElement;
-                }
-                else if ((collision.collisionType == 'self' && collision.toolbar) || collision.collisionType == 'mutual') {
-                    // choose a merge block to display
-                    if (collision.rowBlock) {
-                        updateClass(collision.rowBlock, 'is-dragenter');
-                        removeRectangles();
-                        return;
-                    }
-                    else if (collision.mergeSide /* && mouseOnElm*/) {
-                        let blockClass = `.${collision.mergeSide}-block`;
-                        const block = collision.mergeSide == 'top' || collision.mergeSide == 'bottom'
-                            ? collision.toolbar.querySelector(blockClass)
-                            : collision.section.querySelector(blockClass);
-                        block.visible = true;
-                        updateClass(block, 'is-dragenter');
-                        return;
-                    }
-                    else if (collision.section) {
-                        // handle dragging to the bottom of other elm
-                        const dragOverSection = eventTarget.closest && eventTarget.closest('ide-section');
-                        if (dragOverSection) {
-                            const lastIdeToolbars = dragOverSection.querySelectorAll('ide-toolbar:last-child');
-                            const lastIdeToolbar = lastIdeToolbars.length > 0 ? lastIdeToolbars[0] : undefined;
-                            if (lastIdeToolbars.length > 0) {
-                                const bottomBlock = lastIdeToolbar.querySelector('.bottom-block');
-                                bottomBlock.visible = true;
-                                bottomBlock && updateClass(bottomBlock, 'is-dragenter');
-                                return;
+                        // dragover toolbar(element)
+                        else if (dragDropResult.details.toolbar && dragDropResult.details.dropSide) {
+                            const toolbar = dragDropResult.details.toolbar;
+                            if (dragDropResult.details.dropSide == "top") {
+                                const topBlock = toolbar.querySelector('.top-block');
+                                if (topBlock) {
+                                    topBlock.visible = true;
+                                    updateClass(topBlock, 'is-dragenter');
+                                }
+                            }
+                            else if (dragDropResult.details.dropSide == "bottom") {
+                                const bottomBlock = toolbar.querySelector('.bottom-block');
+                                if (bottomBlock) {
+                                    bottomBlock.visible = true;
+                                    updateClass(bottomBlock, 'is-dragenter');
+                                }
+                            }
+                            else {
+                                console.error("Toolbar(element)'s dropSide can only be 'top' or 'bottom'");
                             }
                         }
                     }
+                    // dragover empty space, show frame
+                    else {
+                        // if (enterTarget == dragOverTarget) return;
+                        // leave previous element: dragOverTarget
+                        dragLeave(dragOverTarget, event.clientX, true);
+                        // enter current element: enterTarget
+                        dragEnter(eventTarget, event.clientX, event.clientY);
+                        dragOverTarget = enterTarget;
+                    }
                 }
-                else
-                    return;
-                if (enterTarget == dragOverTarget)
-                    return;
-                // leave previous element: dragOverTarget
-                dragLeave(dragOverTarget, event.clientX, true);
-                // enter current element: enterTarget
-                dragEnter(enterTarget, event.clientX, event.clientY);
-                dragOverTarget = enterTarget;
             });
             this.addEventListener('dragleave', function (event) {
                 const eventTarget = event.target;
@@ -5616,7 +5668,7 @@ define("@scom/scom-page-builder/page/pageRow.tsx", ["require", "exports", "@ijst
                 const dragDropResult = (0, dragDrop_1.checkDragDropResult)({
                     dropTarget: eventTarget,
                     dragSection: dragStartTargetSection,
-                    dragToolbardata: self.currentElement.dataset,
+                    dragToolbar: (self.currentToolbar) ? self.currentToolbar : undefined,
                     clientX: event.clientX,
                     clientY: event.clientY,
                     startX: startX,
@@ -5814,6 +5866,7 @@ define("@scom/scom-page-builder/page/pageRow.tsx", ["require", "exports", "@ijst
                 }
             }
             function showRectangle(targetRow, colStart, columnSpan) {
+                removeRectangles();
                 const rectangle = targetRow.querySelector(`.rectangle`);
                 if (!rectangle)
                     return;
