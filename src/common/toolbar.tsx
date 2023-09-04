@@ -511,7 +511,7 @@ export class IDEToolbar extends Module {
     }
 
     private isTexbox(data: IPageBlockData | undefined) {
-        if (data)
+        if (data && data.name)
             return data.name.toLowerCase() === ELEMENT_NAME.TEXTBOX.toLowerCase();
         else
             return false;

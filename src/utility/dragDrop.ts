@@ -88,6 +88,8 @@ export const checkDragDropResult = (dragDrop: checkDragDropResultParams): DragDr
         const rowId = dragDrop.dropTarget.closest('ide-row').id.replace('row-', "")
         const rowData = pageObject.getSection(rowId);
 
+        const inPnlRowWrap = dragDrop.dropTarget.closest('#pnlRowWrap');
+        
         let dropOutSide = false;
         if (nearestPanel) {
             const nearestPanelCol = parseInt(nearestPanel.getAttribute("data-column"))
@@ -99,7 +101,7 @@ export const checkDragDropResult = (dragDrop: checkDragDropResultParams): DragDr
         }
 
         // case 4: mouse on empty space
-        if (nearestPanel && !dropOutSide) {
+        if (nearestPanel && !dropOutSide && inPnlRowWrap) {
             if (fromSidebar) {
                 return { canDrop: true, details: { type: 'move', nearestPanel: nearestPanel } }
             } else {
@@ -123,7 +125,6 @@ export const checkDragDropResult = (dragDrop: checkDragDropResultParams): DragDr
                         }
                     }
                 } else {
-                    const nearestPanel = findNearestFixedGridInRow(dragDrop.clientX, dragDrop.dropTarget);
                     return { canDrop: true, details: { type: 'move', nearestPanel: nearestPanel } }
                 }
             }

@@ -1076,6 +1076,7 @@ define("@scom/scom-page-builder/utility/dragDrop.ts", ["require", "exports", "@s
             const nearestPanel = findNearestFixedGridInRow(dragDrop.clientX, dragDrop.dropTarget);
             const rowId = dragDrop.dropTarget.closest('ide-row').id.replace('row-', "");
             const rowData = index_2.pageObject.getSection(rowId);
+            const inPnlRowWrap = dragDrop.dropTarget.closest('#pnlRowWrap');
             let dropOutSide = false;
             if (nearestPanel) {
                 const nearestPanelCol = parseInt(nearestPanel.getAttribute("data-column"));
@@ -1089,7 +1090,7 @@ define("@scom/scom-page-builder/utility/dragDrop.ts", ["require", "exports", "@s
                 }
             }
             // case 4: mouse on empty space
-            if (nearestPanel && !dropOutSide) {
+            if (nearestPanel && !dropOutSide && inPnlRowWrap) {
                 if (fromSidebar) {
                     return { canDrop: true, details: { type: 'move', nearestPanel: nearestPanel } };
                 }
@@ -1115,7 +1116,6 @@ define("@scom/scom-page-builder/utility/dragDrop.ts", ["require", "exports", "@s
                         };
                     }
                     else {
-                        const nearestPanel = findNearestFixedGridInRow(dragDrop.clientX, dragDrop.dropTarget);
                         return { canDrop: true, details: { type: 'move', nearestPanel: nearestPanel } };
                     }
                 }
@@ -6919,7 +6919,7 @@ define("@scom/scom-page-builder/common/toolbar.tsx", ["require", "exports", "@ij
             }
         }
         isTexbox(data) {
-            if (data)
+            if (data && data.name)
                 return data.name.toLowerCase() === index_54.ELEMENT_NAME.TEXTBOX.toLowerCase();
             else
                 return false;
